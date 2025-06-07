@@ -23,7 +23,7 @@
 
 ## 使用說明
 
-1. [使用Demo](jokctseng.github.io/timer) 或下載並於現代瀏覽器開啟 `index.html`檔案  
+1. [使用Demo](https://jokctseng.github.io/timer) 或下載並於現代瀏覽器開啟 `index.html`檔案  
 2. 在設定區域輸入倒數計時名稱與時、分、秒  
 3. 選擇或自訂提前提醒秒數 
 4. 選擇提醒方式（響聲提醒、紅字閃爍或無）  
