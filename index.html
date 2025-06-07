@@ -4,6 +4,27 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>自訂倒數計時器</title>
+
+<!-- Font Awesome CDN -->
+<link
+  rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+  crossorigin="anonymous"
+  referrerpolicy="no-referrer"
+/>
+
+<!-- 社交卡片預覽圖 meta -->
+<meta property="og:title" content="自訂倒數計時器" />
+<meta property="og:description" content="方便好用的倒數計時器，支援響聲、閃爍等多種提醒方式。" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://jokctseng.github.io/timer" />
+<meta property="og:image" content="/preview.png" />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="自訂倒數計時器" />
+<meta name="twitter:description" content="方便好用的倒數計時器，支援響聲、閃爍等多種提醒方式。" />
+<meta name="twitter:image" content="/preview.png" />
+
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@700;900&display=swap');
   body {
@@ -78,7 +99,19 @@
     color: #444;
     margin-bottom: 0.8rem;
   }
-
+  .custom-alert-tip {
+    font-size: 0.9rem;
+    color: #007bff;
+    margin-top: -0.8rem;
+    margin-bottom: 0.8rem;
+    display: none;
+  }
+  .warning {
+    color: red;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    display: none;
+  }
   /* 全螢幕倒數 */
   .fullscreen-overlay {
     position: fixed;
@@ -91,6 +124,15 @@
     align-items: center;
     z-index: 9999;
     user-select: none;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    font-weight: 900;
+    font-size: 20vw;
+  }
+  .fullscreen-overlay.active {
+    visibility: visible;
+    opacity: 1;
   }
   .fullscreen-timer-name {
     font-size: 6vw;
@@ -99,15 +141,30 @@
     text-shadow: 0 0 4px #0ff88;
   }
   .fullscreen-timer-time {
-    font-size: 20vw;
     font-weight: 900;
-    /* 光暈式柔和陰影 */
-    text-shadow:
-      0 0 3px #0ff,
-      0 0 8px #0ff;
+    text-shadow: 0 0 3px #0ff, 0 0 8px #0ff;
   }
-  .hidden {
-    display: none !important;
+  #pauseResumeBtn {
+    margin-top: 1rem;
+    font-size: 7vw;
+    padding: 0.1em 0.2em;
+    width: auto;
+    height: auto;
+    border-radius: 8px;
+    border: none;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4em;
+    user-select: none;
+    transition: background-color 0.25s ease;
+  }
+ 
+  #pauseResumeBtn:hover {
+    background: #0056b3;
   }
   .alert-flash {
     animation: flash 1s infinite;
@@ -121,20 +178,31 @@
 </head>
 <body>
 
-<div class="timer-container">
+<div class="timer-container" id="timerContainer">
   <h1>自訂倒數計時器</h1>
-  
+
+  <div id="warningMsg" class="warning"></div>
+
   <label for="timerName">計時器名稱</label>
   <input type="text" id="timerName" placeholder="輸入計時器名稱" />
-  
+
   <label>倒數時間</label>
   <div class="time-inputs">
     <input type="number" id="hours" min="0" max="23" placeholder="時" />
     <input type="number" id="minutes" min="0" max="59" placeholder="分" />
     <input type="number" id="seconds" min="0" max="59" placeholder="秒" />
   </div>
-  
-  <label for="alertTime">提前提醒時間 (秒)</label>
+
+  <label>自訂提前提醒時間</label>
+  <div style="display: flex; gap: 0.5rem; margin-bottom: 0.1rem;">
+    <input type="number" id="alertTimeCustomMinutes" min="0" placeholder="分鐘" />
+    <input type="number" id="alertTimeCustomSeconds" min="0" max="59" placeholder="秒" />
+  </div>
+  <div id="customAlertTip" class="custom-alert-tip">
+    目前使用自訂提前提醒時間
+  </div>
+
+  <label for="alertTime">或參考快捷選項</label>
   <select id="alertTime">
     <option value="10">10 秒</option>
     <option value="30" selected>30 秒</option>
@@ -142,8 +210,9 @@
     <option value="120">2分鐘</option>
     <option value="300">5分鐘</option>
     <option value="0">不提醒</option>
+    <option value="custom" disabled>已自訂</option>
   </select>
-  
+
   <label for="alertType">提醒方式</label>
   <select id="alertType">
     <option value="sound" selected>響聲提醒</option>
@@ -160,17 +229,16 @@
     <option value="notify">Notify</option>
     <option value="ping">Ping</option>
   </select>
-  
+
   <button id="startBtn">開始倒數</button>
-  
-  <div class="timer-name-display" id="displayTimerName"></div>
-  <div class="display" id="timeDisplay">00:00:00</div>
 </div>
 
-<!-- 全螢幕倒數區 -->
-<div id="fullscreenOverlay" class="fullscreen-overlay hidden" tabindex="0">
+<div id="fullscreenOverlay" class="fullscreen-overlay" tabindex="0" aria-hidden="true">
   <div id="fullscreenTimerName" class="fullscreen-timer-name"></div>
-  <div id="fullscreenTimerTime" class="fullscreen-timer-time"></div>
+  <div id="fullscreenTimerTime" class="fullscreen-timer-time">00:00:00</div>
+  <button id="pauseResumeBtn" title="暫停 / 繼續">
+    <i class="fa-solid fa-pause"></i>
+  </button>
 </div>
 
 <!-- 音效 -->
@@ -184,16 +252,25 @@
 <script>
   const startBtn = document.getElementById('startBtn');
   const alertTimeSelect = document.getElementById('alertTime');
+  const alertTimeCustomMinutes = document.getElementById('alertTimeCustomMinutes');
+  const alertTimeCustomSeconds = document.getElementById('alertTimeCustomSeconds');
+  const customAlertTip = document.getElementById('customAlertTip');
   const alertTypeSelect = document.getElementById('alertType');
   const soundSelect = document.getElementById('soundSelect');
-
   const fullscreenOverlay = document.getElementById('fullscreenOverlay');
   const fullscreenTimerName = document.getElementById('fullscreenTimerName');
   const fullscreenTimerTime = document.getElementById('fullscreenTimerTime');
-  const timerContainer = document.querySelector('.timer-container');
+  const timerContainer = document.getElementById('timerContainer');
+  const warningMsg = document.getElementById('warningMsg');
+  const pauseResumeBtn = document.getElementById('pauseResumeBtn');
 
   let countdownInterval = null;
   let alerted = false;
+  let isPaused = false;
+  let totalSeconds = 0;
+  let alertSeconds = 0;
+  let alertType = 'sound';
+  let soundId = 'beep';
 
   function formatTime(sec) {
     const h = Math.floor(sec / 3600);
@@ -206,101 +283,182 @@
     ].join(':');
   }
 
- // 播放響聲
-function playSoundOneSecond(soundId) {
-  const sound = document.getElementById(soundId);
-  if (!sound) return;
-
-  let playCount = 0;
-  const maxCount = 3; 
-
-  function playNext() {
-    if (playCount >= maxCount) return;
+  function playSoundOnce(soundId) {
+    const sound = document.getElementById(soundId);
+    if (!sound) return;
+    sound.pause();
     sound.currentTime = 0;
-    const playPromise = sound.play();
-    if (playPromise !== undefined) {
-      playPromise.then(() => {
-        playCount++;
-        sound.removeEventListener('ended', playNext);
-        sound.addEventListener('ended', playNext);
-      }).catch((e) => {
-        // 播放失敗處理（可忽略）
-      });
+    sound.play().catch(() => {});
+  }
+
+  function playSoundThrice(soundId, callback) {
+    const sound = document.getElementById(soundId);
+    if (!sound) {
+      if (callback) callback();
+      return;
+    }
+    let playCount = 0;
+    const maxCount = 3;
+    sound.pause();
+    sound.currentTime = 0;
+    sound.playbackRate = 2.0; // 加速播三聲
+
+    function onEnded() {
+      playCount++;
+      if (playCount >= maxCount) {
+        sound.removeEventListener('ended', onEnded);
+        if (callback) callback();
+      } else {
+        sound.currentTime = 0;
+        sound.play();
+      }
+    }
+    sound.addEventListener('ended', onEnded);
+    sound.play().catch(() => {
+      if (callback) callback();
+    });
+  }
+
+  function updateAlertTimeSelect() {
+    if (
+      alertTimeCustomMinutes.value.trim() !== '' ||
+      alertTimeCustomSeconds.value.trim() !== ''
+    ) {
+      alertTimeSelect.value = 'custom';
+      customAlertTip.style.display = 'block';
+    } else {
+      if (alertTimeSelect.value === 'custom') {
+        alertTimeSelect.value = '30';
+      }
+      customAlertTip.style.display = 'none';
     }
   }
-  playNext();
-}
 
+  alertTimeCustomMinutes.addEventListener('input', updateAlertTimeSelect);
+  alertTimeCustomSeconds.addEventListener('input', updateAlertTimeSelect);
 
-  // 按 ESC 鍵退出全螢幕模式
-  fullscreenOverlay.addEventListener('keydown', (e) => {
-    if (e.key === "Escape") {
+  function getAlertSeconds() {
+    const min = parseInt(alertTimeCustomMinutes.value) || 0;
+    const sec = parseInt(alertTimeCustomSeconds.value) || 0;
+    const total = min * 60 + sec;
+    if (total > 0) return total;
+
+    let quickValue = parseInt(alertTimeSelect.value);
+    if (isNaN(quickValue) || quickValue < 0) return 0;
+    return quickValue;
+  }
+
+  function countdownTick() {
+    fullscreenTimerTime.textContent = formatTime(totalSeconds);
+
+    if (!alerted && alertSeconds > 0 && totalSeconds <= alertSeconds && totalSeconds > 0) {
+      alerted = true;
+      if (alertType === 'sound') playSoundOnce(soundId);
+      else if (alertType === 'flash') fullscreenTimerTime.classList.add('alert-flash');
+    }
+
+    if (totalSeconds <= 0) {
       clearInterval(countdownInterval);
       countdownInterval = null;
-      alerted = false;
-      fullscreenOverlay.classList.add('hidden');
-      timerContainer.classList.remove('hidden');
+
+      fullscreenTimerTime.textContent = '00:00:00';
+
+      if (alertType === 'sound') {
+        playSoundThrice(soundId, () => {
+          fullscreenOverlay.classList.remove('active');
+          timerContainer.style.display = 'block';
+          isPaused = false;
+          pauseResumeBtn.innerHTML = '<i class="fa-solid fa-pause"></i>';
+        });
+      } else {
+        fullscreenTimerTime.classList.remove('alert-flash');
+        fullscreenTimerTime.style.color = 'red';
+        setTimeout(() => {
+          fullscreenOverlay.classList.remove('active');
+          timerContainer.style.display = 'block';
+          isPaused = false;
+          pauseResumeBtn.innerHTML = '<i class="fa-solid fa-pause"></i>';
+        }, 3000);
+      }
     }
-  });
+
+    totalSeconds--;
+  }
 
   startBtn.addEventListener('click', () => {
+    warningMsg.style.display = 'none';
+    warningMsg.textContent = '';
+
     if (countdownInterval) {
       clearInterval(countdownInterval);
       countdownInterval = null;
-      alerted = false;
     }
+    alerted = false;
+    isPaused = false;
+    pauseResumeBtn.innerHTML = '<i class="fa-solid fa-pause"></i>';
 
     const name = document.getElementById('timerName').value.trim() || '未命名計時器';
     const h = parseInt(document.getElementById('hours').value) || 0;
     const m = parseInt(document.getElementById('minutes').value) || 0;
     const s = parseInt(document.getElementById('seconds').value) || 0;
 
-    let totalSeconds = h * 3600 + m * 60 + s;
+    totalSeconds = h * 3600 + m * 60 + s;
     if (totalSeconds <= 0) {
-      alert('請輸入有效的倒數時間');
+      warningMsg.textContent = '請輸入有效的倒數時間';
+      warningMsg.style.display = 'block';
       return;
     }
 
-    const alertSeconds = parseInt(alertTimeSelect.value);
-    const alertType = alertTypeSelect.value;
-    const soundId = soundSelect.value;
+    alertSeconds = getAlertSeconds();
 
-    // 隱藏設定區，顯示全螢幕倒數
-    timerContainer.classList.add('hidden');
-    fullscreenOverlay.classList.remove('hidden');
-    fullscreenOverlay.focus();
+    if (alertSeconds >= totalSeconds) {
+      warningMsg.textContent = '提前提醒時間應小於倒數時間，請重新設定';
+      warningMsg.style.display = 'block';
+      return;
+    }
 
+    alertType = alertTypeSelect.value;
+    soundId = soundSelect.value;
+
+    // 顯示全螢幕倒數區，隱藏設定頁
+    timerContainer.style.display = 'none';
+    fullscreenOverlay.classList.add('active');
     fullscreenTimerName.textContent = name;
     fullscreenTimerTime.textContent = formatTime(totalSeconds);
     fullscreenTimerTime.classList.remove('alert-flash');
     fullscreenTimerTime.style.color = '#0ff';
 
-    alerted = false;
+    countdownInterval = setInterval(countdownTick, 1000);
+  });
 
-    countdownInterval = setInterval(() => {
-      totalSeconds--;
-      fullscreenTimerTime.textContent = formatTime(totalSeconds);
+  pauseResumeBtn.addEventListener('click', () => {
+    if (!countdownInterval && !isPaused) return;
 
-      if (!alerted && alertSeconds > 0 && totalSeconds <= alertSeconds && totalSeconds > 0) {
-        alerted = true;
-        if (alertType === 'sound') {
-          playSoundOneSecond(soundId);
-        } else if (alertType === 'flash') {
-          fullscreenTimerTime.classList.add('alert-flash');
-        }
-      }
+    if (!isPaused) {
+      // 暫停
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+      isPaused = true;
+      pauseResumeBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
+    } else {
+      // 繼續
+      countdownInterval = setInterval(countdownTick, 1000);
+      isPaused = false;
+      pauseResumeBtn.innerHTML = '<i class="fa-solid fa-pause"></i>';
+    }
+  });
 
-      if (totalSeconds <= 0) {
+  fullscreenOverlay.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (countdownInterval) {
         clearInterval(countdownInterval);
         countdownInterval = null;
-        if (alertType === 'sound') {
-          playSoundOneSecond(soundId);
-        } else if (alertType === 'flash') {
-          fullscreenTimerTime.classList.remove('alert-flash');
-          fullscreenTimerTime.style.color = 'red';
-        }
       }
-    }, 1000);
+      fullscreenOverlay.classList.remove('active');
+      timerContainer.style.display = 'block';
+      isPaused = false;
+      pauseResumeBtn.innerHTML = '<i class="fa-solid fa-pause"></i>';
+    }
   });
 </script>
 
